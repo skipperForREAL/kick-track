@@ -4,17 +4,29 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Trophy } from 'lucide-react';
 
 interface Match {
-  idEvent: string;
-  strEvent: string;
-  strHomeTeam: string;
-  strAwayTeam: string;
-  intHomeScore?: string;
-  intAwayScore?: string;
-  strStatus: string;
-  strProgress?: string;
-  strLeague: string;
-  strTime: string;
-  dateEvent: string;
+  id: number;
+  homeTeam: {
+    id: number;
+    name: string;
+    shortName: string;
+  };
+  awayTeam: {
+    id: number;
+    name: string;
+    shortName: string;
+  };
+  score: {
+    fullTime: {
+      home: number | null;
+      away: number | null;
+    };
+  };
+  status: string;
+  utcDate: string;
+  competition: {
+    id: number;
+    name: string;
+  };
 }
 
 interface GroupedMatches {
@@ -32,37 +44,44 @@ const TodayMatches: React.FC<TodayMatchesProps> = ({ onMatchSelect }) => {
   const fetchTodayMatches = async () => {
     try {
       setLoading(true);
-      const today = new Date();
-      const dateStr = today.toISOString().split('T')[0];
+      const today = new Date().toISOString().split('T')[0];
       
-      // Fetch matches for today using TheSportsDB API
-      const response = await fetch(`https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d=${dateStr}&s=Soccer`);
+      // Use football-data.org API for current matches  
+      const response = await fetch(`https://api.football-data.org/v4/matches?dateFrom=${today}&dateTo=${today}`, {
+        headers: {
+          'X-Auth-Token': import.meta.env.VITE_FOOTBALL_API_KEY || 'demo'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+      
       const data = await response.json();
       
-      if (data.events) {
-        // Group matches by league
-        const grouped = data.events.reduce((acc: GroupedMatches, match: Match) => {
-          const league = match.strLeague || 'Other';
-          if (!acc[league]) {
-            acc[league] = [];
+      if (data.matches) {
+        // Group matches by competition
+        const grouped = data.matches.reduce((acc: GroupedMatches, match: Match) => {
+          const competition = match.competition.name;
+          if (!acc[competition]) {
+            acc[competition] = [];
           }
-          acc[league].push(match);
+          acc[competition].push(match);
           return acc;
         }, {});
         
-        // Sort matches within each league by time
-        Object.keys(grouped).forEach(league => {
-          grouped[league].sort((a, b) => {
-            const timeA = a.strTime || '00:00:00';
-            const timeB = b.strTime || '00:00:00';
-            return timeA.localeCompare(timeB);
-          });
+        // Sort matches within each competition by time
+        Object.keys(grouped).forEach(competition => {
+          grouped[competition].sort((a, b) => 
+            new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime()
+          );
         });
         
         setTodayMatches(grouped);
       }
     } catch (error) {
       console.error('Error fetching today matches:', error);
+      setTodayMatches({});
     } finally {
       setLoading(false);
     }
@@ -72,22 +91,16 @@ const TodayMatches: React.FC<TodayMatchesProps> = ({ onMatchSelect }) => {
     fetchTodayMatches();
   }, []);
 
-  const getStatusColor = (match: Match) => {
-    if (match.strProgress) return 'match-live';
-    if (match.strStatus?.toLowerCase().includes('full') || match.strStatus?.toLowerCase().includes('finished')) return 'match-finished';
-    return 'match-upcoming';
-  };
-
   const getStatusBadge = (match: Match) => {
-    if (match.strProgress) {
+    if (match.status === 'IN_PLAY' || match.status === 'LIVE') {
       return (
         <Badge variant="outline" className="match-live pulse-glow border-match-live text-match-live">
-          LIVE {match.strProgress}
+          LIVE
         </Badge>
       );
     }
     
-    if (match.strStatus?.toLowerCase().includes('full') || match.strStatus?.toLowerCase().includes('finished')) {
+    if (match.status === 'FINISHED') {
       return (
         <Badge variant="outline" className="text-match-finished">
           FT
@@ -97,7 +110,11 @@ const TodayMatches: React.FC<TodayMatchesProps> = ({ onMatchSelect }) => {
     
     return (
       <Badge variant="outline" className="text-match-upcoming">
-        {match.strTime?.substring(0, 5) || 'TBD'}
+        {new Date(match.utcDate).toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        })}
       </Badge>
     );
   };
@@ -182,14 +199,18 @@ const TodayMatches: React.FC<TodayMatchesProps> = ({ onMatchSelect }) => {
                 <div className="space-y-3">
                   {todayMatches[league].map((match, matchIndex) => (
                     <div
-                      key={match.idEvent}
+                      key={match.id}
                       className="p-4 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
-                      onClick={() => onMatchSelect(match.idEvent)}
+                      onClick={() => onMatchSelect(match.id.toString())}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="h-4 w-4" />
-                          {match.strTime?.substring(0, 5) || 'TBD'}
+                          {new Date(match.utcDate).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                          })}
                         </div>
                         {getStatusBadge(match)}
                       </div>
@@ -197,20 +218,20 @@ const TodayMatches: React.FC<TodayMatchesProps> = ({ onMatchSelect }) => {
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="font-semibold team-home text-sm mb-1">
-                            {match.strHomeTeam}
+                            {match.homeTeam.shortName || match.homeTeam.name}
                           </div>
                           <div className="font-semibold team-away text-sm">
-                            {match.strAwayTeam}
+                            {match.awayTeam.shortName || match.awayTeam.name}
                           </div>
                         </div>
 
-                        {(match.intHomeScore !== undefined && match.intAwayScore !== undefined) ? (
+                        {(match.score.fullTime.home !== null && match.score.fullTime.away !== null) ? (
                           <div className="text-right">
                             <div className="font-bold text-sm">
-                              <span className="team-home">{match.intHomeScore}</span>
+                              <span className="team-home">{match.score.fullTime.home}</span>
                             </div>
                             <div className="font-bold text-sm">
-                              <span className="team-away">{match.intAwayScore}</span>
+                              <span className="team-away">{match.score.fullTime.away}</span>
                             </div>
                           </div>
                         ) : (

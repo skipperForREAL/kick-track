@@ -4,15 +4,30 @@ import { Badge } from '@/components/ui/badge';
 import { Clock, Users } from 'lucide-react';
 
 interface Match {
-  Id: string;
-  HomeTeam: string;
-  AwayTeam: string;
-  HomeGoals: string;
-  AwayGoals: string;
-  Time: string;
-  League: string;
-  Date: string;
-  Location?: string;
+  id: number;
+  homeTeam: {
+    id: number;
+    name: string;
+    shortName: string;
+  };
+  awayTeam: {
+    id: number;
+    name: string;
+    shortName: string;
+  };
+  score: {
+    fullTime: {
+      home: number | null;
+      away: number | null;
+    };
+  };
+  status: string;
+  utcDate: string;
+  competition: {
+    id: number;
+    name: string;
+  };
+  venue?: string;
 }
 
 interface LiveMatchesProps {
@@ -27,18 +42,47 @@ const LiveMatches: React.FC<LiveMatchesProps> = ({ onMatchSelect }) => {
   const fetchLiveMatches = async () => {
     try {
       setLoading(true);
-      // Using TheSportsDB API free endpoints
-      const response = await fetch('https://www.thesportsdb.com/api/v1/json/3/latestsoccer.php');
+      
+      // Get today's date
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Use football-data.org API for current matches
+      const response = await fetch(`https://api.football-data.org/v4/matches?dateFrom=${today}&dateTo=${today}`, {
+        headers: {
+          'X-Auth-Token': import.meta.env.VITE_FOOTBALL_API_KEY || 'demo' // Free tier available
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+      
       const data = await response.json();
       
-      if (data.teams && data.teams.Match) {
-        // Take latest matches and treat them as "live" for demo purposes
-        const matches = data.teams.Match.slice(0, 8); // Limit to 8 matches for better UX
-        setLiveMatches(matches);
+      if (data.matches) {
+        // Filter for live and recently finished matches, prioritize live ones
+        const currentMatches = data.matches
+          .filter((match: Match) => 
+            match.status === 'IN_PLAY' || 
+            match.status === 'PAUSED' || 
+            match.status === 'FINISHED' ||
+            match.status === 'LIVE'
+          )
+          .sort((a: Match, b: Match) => {
+            // Prioritize live matches
+            if (a.status === 'IN_PLAY' && b.status !== 'IN_PLAY') return -1;
+            if (b.status === 'IN_PLAY' && a.status !== 'IN_PLAY') return 1;
+            return 0;
+          })
+          .slice(0, 10);
+        
+        setLiveMatches(currentMatches);
       }
       setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching live matches:', error);
+      // Fallback message for users
+      setLiveMatches([]);
     } finally {
       setLoading(false);
     }
@@ -53,16 +97,30 @@ const LiveMatches: React.FC<LiveMatchesProps> = ({ onMatchSelect }) => {
   }, []);
 
   const getStatusBadge = (match: Match) => {
-    if (match.Time && match.Time.includes("'")) {
+    if (match.status === 'IN_PLAY' || match.status === 'LIVE') {
       return (
         <Badge variant="outline" className="match-live pulse-glow border-match-live text-match-live">
-          LIVE {match.Time}
+          LIVE
+        </Badge>
+      );
+    }
+    if (match.status === 'PAUSED') {
+      return (
+        <Badge variant="outline" className="match-live border-match-live text-match-live">
+          HALF TIME
+        </Badge>
+      );
+    }
+    if (match.status === 'FINISHED') {
+      return (
+        <Badge variant="outline" className="text-match-finished">
+          FINISHED
         </Badge>
       );
     }
     return (
-      <Badge variant="outline" className="text-match-finished">
-        FINISHED
+      <Badge variant="outline" className="text-match-upcoming">
+        {match.status}
       </Badge>
     );
   };
@@ -107,19 +165,19 @@ const LiveMatches: React.FC<LiveMatchesProps> = ({ onMatchSelect }) => {
         <div className="grid gap-4">
           {liveMatches.map((match, index) => (
             <Card 
-              key={match.Id} 
+              key={match.id} 
               className="match-card fade-in cursor-pointer"
               style={{ animationDelay: `${index * 0.1}s` }}
-              onClick={() => onMatchSelect(match.Id)}
+              onClick={() => onMatchSelect(match.id.toString())}
             >
               <CardContent className="p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1">
                     <div className="text-sm text-muted-foreground mb-1">
-                      {match.League}
+                      {match.competition.name}
                     </div>
                     <div className="font-semibold text-foreground">
-                      {match.HomeTeam} vs {match.AwayTeam}
+                      {match.homeTeam.name} vs {match.awayTeam.name}
                     </div>
                   </div>
                   {getStatusBadge(match)}
@@ -128,26 +186,28 @@ const LiveMatches: React.FC<LiveMatchesProps> = ({ onMatchSelect }) => {
                 <div className="flex items-center justify-between">
                   <div className="flex-1 text-center">
                     <div className="font-bold text-lg team-home">
-                      {match.HomeTeam}
+                      {match.homeTeam.shortName || match.homeTeam.name}
                     </div>
                   </div>
                   
                   <div className="px-6">
                     <div className="text-2xl font-bold text-center">
-                      <span className="team-home">{match.HomeGoals || '0'}</span>
+                      <span className="team-home">{match.score.fullTime.home ?? '-'}</span>
                       <span className="text-muted-foreground mx-2">-</span>
-                      <span className="team-away">{match.AwayGoals || '0'}</span>
+                      <span className="team-away">{match.score.fullTime.away ?? '-'}</span>
                     </div>
-                    {match.Location && (
-                      <div className="text-xs text-muted-foreground text-center mt-1">
-                        {match.Location}
-                      </div>
-                    )}
+                    <div className="text-xs text-muted-foreground text-center mt-1">
+                      {new Date(match.utcDate).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                      })}
+                    </div>
                   </div>
 
                   <div className="flex-1 text-center">
                     <div className="font-bold text-lg team-away">
-                      {match.AwayTeam}
+                      {match.awayTeam.shortName || match.awayTeam.name}
                     </div>
                   </div>
                 </div>

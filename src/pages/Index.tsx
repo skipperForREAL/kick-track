@@ -59,6 +59,22 @@ const Index = () => {
               REAL-TIME SCORES
             </Badge>
           </div>
+          
+          {/* API Info */}
+          <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border">
+            <p className="text-sm text-muted-foreground text-center">
+              <strong>Pro Tip:</strong> For more live matches including PSG, get a free API key at{' '}
+              <a 
+                href="https://www.football-data.org/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                football-data.org
+              </a>{' '}
+              and add it as VITE_FOOTBALL_API_KEY in your environment
+            </p>
+          </div>
         </header>
 
         {/* Navigation Tabs */}
@@ -100,7 +116,7 @@ const Index = () => {
         {/* Footer */}
         <footer className="text-center mt-16 pt-8 border-t border-border">
           <p className="text-sm text-muted-foreground">
-            Powered by TheSportsDB API • Real-time football data
+            Powered by football-data.org API • Real-time football data
           </p>
           <div className="flex items-center justify-center gap-2 mt-2">
             <div className="h-2 w-2 bg-match-live rounded-full pulse-glow"></div>
