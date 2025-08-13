@@ -6,17 +6,17 @@ import { ArrowLeft, MapPin, Clock, Users, Target, AlertTriangle } from 'lucide-r
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface MatchEvent {
-  idEvent: string;
-  strEvent: string;
-  strHomeTeam: string;
-  strAwayTeam: string;
-  intHomeScore: string;
-  intAwayScore: string;
-  strStatus: string;
-  strProgress: string;
-  strLeague: string;
-  strTime: string;
-  strVenue: string;
+  idEvent?: string;
+  strEvent?: string;
+  strHomeTeam?: string;
+  strAwayTeam?: string;
+  intHomeScore?: string;
+  intAwayScore?: string;
+  strStatus?: string;
+  strProgress?: string;
+  strLeague?: string;
+  strTime?: string;
+  strVenue?: string;
   strDescriptionEN?: string;
   strHomeFormation?: string;
   strAwayFormation?: string;
@@ -69,16 +69,9 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({ matchId, onBack }) => {
   };
 
   const getStatusBadge = (match: MatchEvent) => {
-    if (match.strProgress) {
-      return (
-        <Badge variant="outline" className="match-live pulse-glow border-match-live text-match-live">
-          LIVE {match.strProgress}
-        </Badge>
-      );
-    }
     return (
       <Badge variant="outline" className="text-match-finished">
-        {match.strStatus || 'Scheduled'}
+        FINISHED
       </Badge>
     );
   };

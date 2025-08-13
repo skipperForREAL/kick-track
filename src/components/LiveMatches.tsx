@@ -4,17 +4,15 @@ import { Badge } from '@/components/ui/badge';
 import { Clock, Users } from 'lucide-react';
 
 interface Match {
-  idEvent: string;
-  strEvent: string;
-  strHomeTeam: string;
-  strAwayTeam: string;
-  intHomeScore: string;
-  intAwayScore: string;
-  strStatus: string;
-  strProgress: string;
-  strLeague: string;
-  strTime: string;
-  strThumb?: string;
+  Id: string;
+  HomeTeam: string;
+  AwayTeam: string;
+  HomeGoals: string;
+  AwayGoals: string;
+  Time: string;
+  League: string;
+  Date: string;
+  Location?: string;
 }
 
 interface LiveMatchesProps {
@@ -33,14 +31,10 @@ const LiveMatches: React.FC<LiveMatchesProps> = ({ onMatchSelect }) => {
       const response = await fetch('https://www.thesportsdb.com/api/v1/json/3/latestsoccer.php');
       const data = await response.json();
       
-      if (data.events) {
-        // Filter for live matches (status contains "LIVE" or similar indicators)
-        const live = data.events.filter((match: Match) => 
-          match.strStatus?.toLowerCase().includes('live') || 
-          match.strProgress !== null
-        ).slice(0, 10); // Limit to 10 matches for better UX
-        
-        setLiveMatches(live);
+      if (data.teams && data.teams.Match) {
+        // Take latest matches and treat them as "live" for demo purposes
+        const matches = data.teams.Match.slice(0, 8); // Limit to 8 matches for better UX
+        setLiveMatches(matches);
       }
       setLastUpdated(new Date());
     } catch (error) {
@@ -58,23 +52,17 @@ const LiveMatches: React.FC<LiveMatchesProps> = ({ onMatchSelect }) => {
     return () => clearInterval(interval);
   }, []);
 
-  const getStatusColor = (status: string) => {
-    if (status?.toLowerCase().includes('live')) return 'match-live';
-    if (status?.toLowerCase().includes('full') || status?.toLowerCase().includes('finished')) return 'match-finished';
-    return 'match-upcoming';
-  };
-
   const getStatusBadge = (match: Match) => {
-    if (match.strProgress) {
+    if (match.Time && match.Time.includes("'")) {
       return (
         <Badge variant="outline" className="match-live pulse-glow border-match-live text-match-live">
-          LIVE {match.strProgress}
+          LIVE {match.Time}
         </Badge>
       );
     }
     return (
-      <Badge variant="outline" className={getStatusColor(match.strStatus)}>
-        {match.strStatus || 'Scheduled'}
+      <Badge variant="outline" className="text-match-finished">
+        FINISHED
       </Badge>
     );
   };
@@ -119,19 +107,19 @@ const LiveMatches: React.FC<LiveMatchesProps> = ({ onMatchSelect }) => {
         <div className="grid gap-4">
           {liveMatches.map((match, index) => (
             <Card 
-              key={match.idEvent} 
+              key={match.Id} 
               className="match-card fade-in cursor-pointer"
               style={{ animationDelay: `${index * 0.1}s` }}
-              onClick={() => onMatchSelect(match.idEvent)}
+              onClick={() => onMatchSelect(match.Id)}
             >
               <CardContent className="p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1">
                     <div className="text-sm text-muted-foreground mb-1">
-                      {match.strLeague}
+                      {match.League}
                     </div>
                     <div className="font-semibold text-foreground">
-                      {match.strEvent}
+                      {match.HomeTeam} vs {match.AwayTeam}
                     </div>
                   </div>
                   {getStatusBadge(match)}
@@ -140,26 +128,26 @@ const LiveMatches: React.FC<LiveMatchesProps> = ({ onMatchSelect }) => {
                 <div className="flex items-center justify-between">
                   <div className="flex-1 text-center">
                     <div className="font-bold text-lg team-home">
-                      {match.strHomeTeam}
+                      {match.HomeTeam}
                     </div>
                   </div>
                   
                   <div className="px-6">
                     <div className="text-2xl font-bold text-center">
-                      <span className="team-home">{match.intHomeScore || '0'}</span>
+                      <span className="team-home">{match.HomeGoals || '0'}</span>
                       <span className="text-muted-foreground mx-2">-</span>
-                      <span className="team-away">{match.intAwayScore || '0'}</span>
+                      <span className="team-away">{match.AwayGoals || '0'}</span>
                     </div>
-                    {match.strTime && (
+                    {match.Location && (
                       <div className="text-xs text-muted-foreground text-center mt-1">
-                        {match.strTime}
+                        {match.Location}
                       </div>
                     )}
                   </div>
 
                   <div className="flex-1 text-center">
                     <div className="font-bold text-lg team-away">
-                      {match.strAwayTeam}
+                      {match.AwayTeam}
                     </div>
                   </div>
                 </div>
